@@ -1,5 +1,4 @@
-#include <Arduino.h>
-#include "log.h"
+#include "doorbell.h"
 
 /*
 https://lastminuteengineers.com/esp32-deep-sleep-wakeup-sources/
@@ -11,6 +10,9 @@ https://lastminuteengineers.com/esp32-deep-sleep-wakeup-sources/
 // To use the data after reboot, store it in RTC memory by defining a global variable with RTC_DATA_ATTR attribute.
 RTC_DATA_ATTR int bootCount = 0;
 touch_pad_t touchPin;
+
+MQTTClient mqttclient;
+WiFiClient wificlient;   
 
 #ifndef DISABLE_SERIAL_OUTPUT
 /*
@@ -68,7 +70,7 @@ void onTouch(){
 
 void deep_sleep()
 {
-  Sprintln("Going to sleep after: " + String( millis() ) + "ms");
+  Sprintln("Awake for " + String( millis() ) + "ms");
   #ifndef DISABLE_SERIAL_OUTPUT
   Serial.flush();
   #endif
@@ -91,6 +93,17 @@ void setup(){
   //Print the wakeup reason for ESP32 and touchpad too
   print_wakeup_reason();
   #endif
+
+  if(connectWifi(LOCAL_ENV_WIFI_SSID, LOCAL_ENV_WIFI_PASSWORD)){
+    #ifndef DISABLE_SERIAL_OUTPUT
+    printNetworkDetails();
+    #endif
+
+    initMQTTClient(LOCAL_ENV_MQTT_BROKER_HOST, LOCAL_ENV_MQTT_BROKER_PORT, DOORBELL_TOPIC, DOORBELL_SILENT);
+    if(connectMQTTBroker(DEVICE_ID, LOCAL_ENV_MQTT_USERNAME, LOCAL_ENV_MQTT_PASSWORD)){
+        publish(DOORBELL_TOPIC, DOORBELL_RING);
+    }
+  }
 
   //Setup interrupt on Touch Pad 5 (GPIO12) (cannot use SD card)
   touchAttachInterrupt(T5, onTouch, TOUCH_SENSITIVITY_THRESHOLD);
