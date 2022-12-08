@@ -10,17 +10,21 @@
 #include "mqtt-helper.h"
 #include "log.h"
 #include "env.h"
+#include "cam-helper.h"
+#include "soc/soc.h"            // brownout detector
+#include "soc/rtc_cntl_reg.h"   // brownout detector
 
 
-#define DEVICE_ID "esp32-cam"
-#define DEVICE_NAME "Doorbell"
+#define DEVICE_ID           "esp32-cam"
+#define DEVICE_NAME         "Doorbell"
 #define DEVICE_MANUFACTURER "Ai Thinker"
-#define DEVICE_MODEL "ESP32-CAM"
-#define DEVICE_VERSION "20221206.2145"
+#define DEVICE_MODEL        "ESP32-CAM"
+#define DEVICE_VERSION      "20221207.1640"
 
-#define DOORBELL_TOPIC "homeassistant/sensor/doorbell/ring"
-#define DOORBELL_RING "ON"
-#define DOORBELL_SILENT "OFF"
+#define DOORBELL_PIC_TOPIC "homeassistant/camera/doorbell/snapshot"
+#define DOORBELL_TOPIC     "homeassistant/switch/doorbell/ringer"
+#define DOORBELL_RING      "ON"
+#define DOORBELL_SILENT    "OFF"
 
 // *********************************************************************************************************************
 // *** Must Declare ***

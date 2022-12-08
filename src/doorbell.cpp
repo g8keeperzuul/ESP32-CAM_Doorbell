@@ -11,7 +11,7 @@ https://lastminuteengineers.com/esp32-deep-sleep-wakeup-sources/
 RTC_DATA_ATTR int bootCount = 0;
 touch_pad_t touchPin;
 
-MQTTClient mqttclient;
+MQTTClient mqttclient(5000);
 WiFiClient wificlient;   
 
 #ifndef DISABLE_SERIAL_OUTPUT
@@ -63,6 +63,7 @@ void print_wakeup_reason(){
 }
 #endif
 
+
 void onTouch(){
   //placeholder callback function
   Sprintln("DING DONG!");
@@ -79,6 +80,9 @@ void deep_sleep()
 }
 
 void setup(){
+
+  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout detector
+
   #ifndef DISABLE_SERIAL_OUTPUT
   Serial.begin(9600);
   //Serial.setDebugOutput(true);
@@ -96,14 +100,35 @@ void setup(){
 
   if(connectWifi(LOCAL_ENV_WIFI_SSID, LOCAL_ENV_WIFI_PASSWORD)){
     #ifndef DISABLE_SERIAL_OUTPUT
-    printNetworkDetails();
+    //printNetworkDetails();
     #endif
-
     initMQTTClient(LOCAL_ENV_MQTT_BROKER_HOST, LOCAL_ENV_MQTT_BROKER_PORT, DOORBELL_TOPIC, DOORBELL_SILENT);
     if(connectMQTTBroker(DEVICE_ID, LOCAL_ENV_MQTT_USERNAME, LOCAL_ENV_MQTT_PASSWORD)){
-        publish(DOORBELL_TOPIC, DOORBELL_RING);
+        // ring doorbell
+        if(publish(DOORBELL_TOPIC, DOORBELL_RING)){
+          
+          if(initCamera()){
+            // take picture
+            camera_fb_t *cam_frame_buf = esp_camera_fb_get();
+
+            // send picture
+            const char* pic_buf = (const char*)(cam_frame_buf->buf);
+            size_t length = cam_frame_buf->len;
+            
+            if(publish(DOORBELL_PIC_TOPIC, pic_buf, length)){ // MUST set QOS = 1 to see failures; otherwise all publish attempts are successful even when no image is published to MQTT broker
+              Sprintln("Total success!");
+            }
+            else{
+              Sprint("Failed to publish picture. LWMQTT last error = ");              
+              Sprintln(mqttclient.lastError()); // 66% of attempts results in LWMQTT_MISSING_OR_WRONG_PACKET = -9
+              //ESP.restart();
+            }
+          }
+        }
     }
   }
+
+  // --- Prepare for sleep ---
 
   //Setup interrupt on Touch Pad 5 (GPIO12) (cannot use SD card)
   touchAttachInterrupt(T5, onTouch, TOUCH_SENSITIVITY_THRESHOLD);

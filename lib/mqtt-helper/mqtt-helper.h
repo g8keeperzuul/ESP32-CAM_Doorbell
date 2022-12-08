@@ -35,6 +35,7 @@ extern WiFiClient wificlient;
 // Connectivity and basic operations
 void initMQTTClient(const IPAddress broker, int port, const char *lwt_topic, const char *payload); 
 bool connectMQTTBroker(const char *client_id, const char *username, const char *password);
-void publish(const String &topic, const String &payload);
+bool publish(const String &topic, const String &payload);
+bool publish(const char* topic, const char* payload, unsigned int length);
 
 #endif

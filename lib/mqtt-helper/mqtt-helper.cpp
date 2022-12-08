@@ -16,6 +16,8 @@ void initMQTTClient(const IPAddress broker, int port, const char *lwt_topic, con
   // https://github.com/256dpi/arduino-mqtt/blob/master/src/MQTTClient.cpp#L199
   //mqttclient.onMessage(messageReceived);
 
+  //mqttclient.setTimeout(5000);
+
   mqttclient.setWill(lwt_topic, payload, RETAINED, QOS_1);
 
   Sprintln(F("Done"));
@@ -41,8 +43,12 @@ bool connectMQTTBroker(const char *client_id, const char *username, const char *
   }
 }
 
-void publish(const String &topic, const String &payload){
-    Sprintln("\nPublishing message: " + topic + " : " + payload);
-    //const char* payload_ch = payload.c_str();
-    mqttclient.publish(topic, payload, NOT_RETAINED, QOS_0);
+bool publish(const String &topic, const String &payload){
+    Sprintln("\nPublishing message: " + topic + " : " + payload);    
+    return mqttclient.publish(topic, payload, NOT_RETAINED, QOS_0);
+}
+
+bool publish(const char* topic, const char* payload, unsigned int length){
+    Sprint("\nPublishing message: "); Sprint(topic); Sprint(" : ["); Sprint(length); Sprintln("]");
+    return mqttclient.publish(topic, payload, length, NOT_RETAINED, QOS_1);
 }

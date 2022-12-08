@@ -1,6 +1,8 @@
 #ifndef LOG_H
 #define LOG_H
 
+#include <Arduino.h>
+
 //#define DISABLE_SERIAL_OUTPUT 1
 
 // https://arduino.stackexchange.com/questions/9857/can-i-make-the-arduino-ignore-serial-print
@@ -11,7 +13,7 @@
 #else
 #define Sprintln(x) (Serial.println(x))
 #define Sprint(x) (Serial.print(x))
-#define SprintlnHEX(x) (Serial.println(x, HEX))
+#define SprintlnHEX(x) (Serial.println(x, 16))
 #endif
 
 #endif
