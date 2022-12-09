@@ -2,6 +2,14 @@
 
 /*
 https://lastminuteengineers.com/esp32-deep-sleep-wakeup-sources/
+https://lastminuteengineers.com/esp32-sleep-modes-power-consumption/
+
+https://github.com/moxl-420/ESP32cam-doorbell
+https://github.com/ldab/ESP32-CAM-MQTT
+
+https://randomnerdtutorials.com/esp32-cam-ov2640-camera-settings/
+
+https://diyi0t.com/best-battery-for-esp32/
 */
 
 #define TOUCH_SENSITIVITY_THRESHOLD 40 /* Greater the value, more the sensitivity */
@@ -11,7 +19,7 @@ https://lastminuteengineers.com/esp32-deep-sleep-wakeup-sources/
 RTC_DATA_ATTR int bootCount = 0;
 touch_pad_t touchPin;
 
-MQTTClient mqttclient(5000);
+MQTTClient mqttclient((25*1024)); //25KB read & write buffers
 WiFiClient wificlient;   
 
 #ifndef DISABLE_SERIAL_OUTPUT
@@ -114,6 +122,9 @@ void setup(){
             // send picture
             const char* pic_buf = (const char*)(cam_frame_buf->buf);
             size_t length = cam_frame_buf->len;
+
+            //const char* pic_buf = FIVEHUNDREDCHARS;
+            //size_t length = 500;
             
             if(publish(DOORBELL_PIC_TOPIC, pic_buf, length)){ // MUST set QOS = 1 to see failures; otherwise all publish attempts are successful even when no image is published to MQTT broker
               Sprintln("Total success!");
@@ -127,6 +138,11 @@ void setup(){
         }
     }
   }
+
+  // provide time to complete publish before shutdown
+  //yield();
+  delay(200);
+  //mqttclient.loop();
 
   // --- Prepare for sleep ---
 

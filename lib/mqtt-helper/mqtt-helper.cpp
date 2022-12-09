@@ -16,7 +16,7 @@ void initMQTTClient(const IPAddress broker, int port, const char *lwt_topic, con
   // https://github.com/256dpi/arduino-mqtt/blob/master/src/MQTTClient.cpp#L199
   //mqttclient.onMessage(messageReceived);
 
-  //mqttclient.setTimeout(5000);
+  mqttclient.setTimeout(5000);
 
   mqttclient.setWill(lwt_topic, payload, RETAINED, QOS_1);
 
