@@ -11,8 +11,7 @@
 //extern WiFiClient wificlient;
 
 // *** Must Implement ***
-bool connectWifi(const char *ssid, const char *passphrase);
-bool assertNetworkConnectivity(const char *ssid, const char *passphrase);
+void connectWifi(const char *ssid, const char *passphrase);
 void printNetworkDetails();
 std::string getMAC();
 std::string getIP();

@@ -1,54 +1,47 @@
 #include "mqtt-helper.h"
 
+AsyncMqttClient mqttClient;
+
 void initMQTTClient(const IPAddress broker, int port, const char *lwt_topic, const char *payload)
 {
-  Sprint(F("Initalize MQTT client for broker:"));
-  Sprint(broker); // IPAddress
-  Sprint(":");
-  Sprint(port); // int
-  Sprint("... ");
+    Sprint(F("Initalize MQTT client for broker:"));
+    Sprint(broker); // IPAddress
+    Sprint(":");
+    Sprint(port); // int
+    Sprint("... ");
 
-  // Note: Local domain names (e.g. "Computer.local" on OSX) are not supported
-  // by Arduino. You need to set the IP address directly.
-  // https://github.com/256dpi/arduino-mqtt/blob/master/src/MQTTClient.h#L101
-  mqttclient.begin(broker, port, wificlient);
+    mqttClient.setServer(broker, port);
+    mqttClient.setWill(lwt_topic, QOS_1, RETAINED, payload);  
 
-  // https://github.com/256dpi/arduino-mqtt/blob/master/src/MQTTClient.cpp#L199
-  //mqttclient.onMessage(messageReceived);
+    mqttClient.onConnect(onMqttConnect);
+    mqttClient.onPublish(onMqttPublish);
+    mqttClient.onDisconnect(onMqttDisconnect);
 
-  mqttclient.setTimeout(5000);
-
-  mqttclient.setWill(lwt_topic, payload, RETAINED, QOS_1);
-
-  Sprintln(F("Done"));
+    Sprintln(F("Done"));
 }
 
-// Returns TRUE if connected to MQTT broker
-bool connectMQTTBroker(const char *client_id, const char *username, const char *password)
+
+void connectMQTTBroker(const char *client_id, const char *username, const char *password)
 {  
-  if(!mqttclient.connected())
-  {
-    Sprint(F("\nAttempting to connect to MQTT broker... "));
-    if(mqttclient.connect(client_id, username, password)){
-        Sprintln(F("Connected!"));
-        return true;
-    }
-    else{
-        Sprintln(F("Failed!"));
-        return false;
-    }
-  }
-  else {
-    return true;
-  }
+    Sprintln(F("\nAttempting to connect to MQTT broker... "));
+    mqttClient.setClientId(client_id);
+    mqttClient.setCredentials(username, password);
+    mqttClient.connect();
 }
 
-bool publish(const String &topic, const String &payload){
+void disconnectMQTTBroker(){
+    Sprintln(F("\nDisconnecting from MQTT broker... "));
+    mqttClient.disconnect();
+}
+
+void publish(const String &topic, const String &payload){
     Sprintln("\nPublishing message: " + topic + " : " + payload);    
-    return mqttclient.publish(topic, payload, NOT_RETAINED, QOS_0);
+    uint16_t packetIdPub = mqttClient.publish(topic.c_str(), QOS_0, NOT_RETAINED, payload.c_str());
+    Sprint("Publishing at QoS 0, packetId: "); Sprintln(packetIdPub);  
 }
 
-bool publish(const char* topic, const char* payload, unsigned int length){
-    Sprint("\nPublishing message: "); Sprint(topic); Sprint(" : ["); Sprint(length); Sprintln("]");
-    return mqttclient.publish(topic, payload, length, NOT_RETAINED, QOS_1);
+void publish(const char* topic, const char* payload, unsigned int length){
+    Sprint("\nPublishing message: "); Sprint(topic); Sprint(" : ["); Sprint(length); Sprintln("]");    
+    uint16_t packetIdPub = mqttClient.publish(topic, QOS_1, NOT_RETAINED, payload, length);
+    Sprint("Publishing at QoS 1, packetId: "); Sprintln(packetIdPub);    
 }
