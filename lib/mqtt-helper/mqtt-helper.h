@@ -1,12 +1,12 @@
 #ifndef MQTT_HA_HELPER_H
 #define MQTT_HA_HELPER_H
 
-#include <AsyncMqttClient.h>
+#include <AsyncMqttClient.h>    // https://github.com/marvinroger/async-mqtt-client
 #include "log.h"
 
 
 // *** MQTT Related Constants ***
-#define MQTT_MIN_FREE_MEMORY (25*1024)
+#define MQTT_MIN_FREE_MEMORY (50*1024)
 #define RETAINED true
 #define NOT_RETAINED false
 #define QOS_0 0
