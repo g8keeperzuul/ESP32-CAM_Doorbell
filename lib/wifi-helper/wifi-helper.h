@@ -8,7 +8,7 @@
 
 // *********************************************************************************************************************
 // *** Must Declare ***
-//extern WiFiClient wificlient;
+extern WiFiClient wificlient;
 
 // *** Must Implement ***
 void connectWifi(const char *ssid, const char *passphrase);

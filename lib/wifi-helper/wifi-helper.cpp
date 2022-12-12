@@ -1,8 +1,6 @@
 //#include <Arduino.h>
 #include "wifi-helper.h"
-
-WiFiClient wificlient;   
-
+ 
 /*
   Attempt to connect to wireless network ONCE, and wait ATTEMPT_DURATION (milliseconds) for 
   connection to be established. 

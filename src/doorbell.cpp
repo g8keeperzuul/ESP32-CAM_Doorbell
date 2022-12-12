@@ -12,6 +12,9 @@ https://randomnerdtutorials.com/esp32-cam-ov2640-camera-settings/
 https://diyi0t.com/best-battery-for-esp32/
 */
 
+WiFiClient wificlient;  
+PubSubClient mqttClient(wificlient);
+
 #define TOUCH_SENSITIVITY_THRESHOLD 40 /* Greater the value, more the sensitivity */
 
 // You can save data in the ESP32’s RTC memory (16kB? SRAM) which is not erased during deep sleep. However, it is erased when the ESP32 is reset.
@@ -111,9 +114,83 @@ void deep_sleep()
   Serial.flush();
   #endif
 
+  //esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF); // 2.8mA
+
   esp_deep_sleep_start();
 }
 
+
+void onMqttDisconnect() {
+  Sprintln("Disconnected from MQTT");
+
+  if(WiFi.isConnected()) {    
+    WiFi.disconnect();
+  }
+  deep_sleep();
+}
+
+void onMqttPublish() {
+  Sprintln("Publish successful.");  
+
+  disconnectMQTTBroker();  
+  onMqttDisconnect();
+}
+
+void onMqttConnect(){
+
+  Sprintln(F("Connected to MQTT broker"));
+  
+  /*
+  if(publish(DOORBELL_TOPIC, DOORBELL_RING)){
+    Sprintln("RING! RING!");
+  }
+  */
+
+  if(initCamera()){
+    // take picture
+    camera_fb_t *cam_frame_buf = esp_camera_fb_get();
+
+    // send picture
+    uint8_t* pic_buf = cam_frame_buf->buf;
+    size_t length = cam_frame_buf->len;
+
+    Sprint("Picture size (bytes) = "); Sprintln(length);
+
+/*
+    if(publish(DOORBELL_PIC_TOPIC, String(length))){
+      delay(100);
+      mqttClient.loop();
+      delay(100);
+
+      publish("test/flush",String(length)); // flushes first message?
+      onMqttPublish();
+    }
+*/
+/*            
+    if(publish(DOORBELL_PIC_TOPIC, (uint8_t*)TEST_PAYLOAD, strlen(TEST_PAYLOAD))){
+      onMqttPublish();
+    }
+*/
+/*
+    if(publish(DOORBELL_PIC_TOPIC, pic_buf, length)){
+      onMqttPublish();
+    } 
+*/    
+    if(publishLarge(DOORBELL_PIC_TOPIC, pic_buf, length)){
+    //  delay(100);
+    //  mqttClient.loop();
+      delay(100);
+      onMqttPublish();
+    } 
+/*
+    if(mqttClient.publish_P(DOORBELL_PIC_TOPIC, pic_buf, length, NOT_RETAINED)){
+      onMqttPublish();
+    } 
+*/
+
+    Sprintln("Publication of picture NOT successful!");
+  }
+}
 
 void WiFiEvent(WiFiEvent_t event) {
     Sprint("[WiFi-event] event: "); Sprintln(event);
@@ -157,7 +234,9 @@ void WiFiEvent(WiFiEvent_t event) {
         #ifndef DISABLE_SERIAL_OUTPUT
         printNetworkDetails();
         #endif
-        connectMQTTBroker(DEVICE_ID, LOCAL_ENV_MQTT_USERNAME, LOCAL_ENV_MQTT_PASSWORD); // --> onMqttConnect()
+        if(connectMQTTBroker(DEVICE_ID, LOCAL_ENV_MQTT_USERNAME, LOCAL_ENV_MQTT_PASSWORD, DOORBELL_TOPIC, DOORBELL_SILENT)){
+          onMqttConnect();
+        }
         break;
     // case SYSTEM_EVENT_STA_DISCONNECTED:
     //     Serial.println("WiFi lost connection");
@@ -167,49 +246,6 @@ void WiFiEvent(WiFiEvent_t event) {
     }
 }
 
-void onMqttConnect(bool sessionPresent){
-
-  Sprintln(F("Connected to MQTT broker"));
-  Sprint("Session present: ");  Sprintln(sessionPresent);
-
-  publish(DOORBELL_TOPIC, DOORBELL_RING); // --> will not call onPublish() since QoS = 0
-
-
-  if(initCamera()){
-    // take picture
-    camera_fb_t *cam_frame_buf = esp_camera_fb_get();
-
-    // send picture
-    const char* pic_buf = (const char*)(cam_frame_buf->buf);
-    size_t length = cam_frame_buf->len;
-          
-    // MUST set QOS = 1 to see failures; otherwise all publish attempts are successful even when no image is published to MQTT broker
-    publish(DOORBELL_PIC_TOPIC, pic_buf, length); // --> onMqttPublish()
-
-    // No delay result in no message sent.
-    //Sprintln("delay");
-    //delay(200);
-  }
-
-}
-
-void onMqttPublish(uint16_t packetId) {
-  Sprintln("Publish acknowledged.");
-  Sprint("  packetId: ");
-  Sprintln(packetId);
-
-  disconnectMQTTBroker();  // --> onMqttDisconnect()
-}
-
-void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
-  Sprintln("Disconnected from MQTT");
-
-  if(WiFi.isConnected()) {
-    //xTimerStart(mqttReconnectTimer, 0);
-    WiFi.disconnect();
-  }
-  deep_sleep();
-}
 
 void setup(){
 
@@ -230,11 +266,13 @@ void setup(){
   print_wakeup_reason();
   #endif
 
-  initMQTTClient(LOCAL_ENV_MQTT_BROKER_HOST, LOCAL_ENV_MQTT_BROKER_PORT, DOORBELL_TOPIC, DOORBELL_SILENT);
+  initMQTTClient(LOCAL_ENV_MQTT_BROKER_HOST, LOCAL_ENV_MQTT_BROKER_PORT);
   
   WiFi.onEvent(WiFiEvent);
 
-  connectWifi(LOCAL_ENV_WIFI_SSID, LOCAL_ENV_WIFI_PASSWORD); // --> WiFiEvent    
+  connectWifi(LOCAL_ENV_WIFI_SSID, LOCAL_ENV_WIFI_PASSWORD); // --> WiFiEvent --> connectMQTTBroker() --> onMqttConnect() [take photo + publish] --> onMqttPublish() --> disconnectMQTTBroker() --> onMqttDisconnect() --> deep_sleep()
+
+  // this line never reached
 }
 
 void loop(){
