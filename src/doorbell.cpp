@@ -12,8 +12,8 @@ https://randomnerdtutorials.com/esp32-cam-ov2640-camera-settings/
 https://diyi0t.com/best-battery-for-esp32/
 */
 
-WiFiClient wificlient;  
-PubSubClient mqttClient(wificlient);
+WiFiClient wificlient;
+HTTPClient httpclient;
 
 #define TOUCH_SENSITIVITY_THRESHOLD 40 /* Greater the value, more the sensitivity */
 
@@ -120,32 +120,37 @@ void deep_sleep()
 }
 
 
-void onMqttDisconnect() {
-  Sprintln("Disconnected from MQTT");
-
-  if(WiFi.isConnected()) {    
-    WiFi.disconnect();
-  }
+void onNetworkDisconnect() {
+  Sprintln("Disconnected from network");
   deep_sleep();
 }
 
-void onMqttPublish() {
-  Sprintln("Publish successful.");  
+/*
+  https://developers.home-assistant.io/docs/api/rest/
+*/
 
-  disconnectMQTTBroker();  
-  onMqttDisconnect();
+/*
+  homeassistant/switch/doorbell/ringer ON
+*/
+void notifyDoorbellMQTT(){
+  Sprintln("RING! RING! [API->MQTT]");
+  String url = String(HA_BASE_URL)+"/services/mqtt/publish";
+  String payload = "{\"topic\":\"homeassistant/switch/doorbell/ringer\", \"payload\": \"ON\", \"retain\":\"False\"}";
+  int rc = postJson(HA_ACCESS_TOKEN, url.c_str(), payload.c_str());
 }
 
-void onMqttConnect(){
+void notifyDoorbell(){
+  Sprintln("RING! RING!");
+  String url = String(HA_BASE_URL)+"/states/switch.doorbell_ringer";
+  String payload = "{\"state\": \"on\", \"attributes\":{\"friendly_name\":\"Doorbell Ringer\", \"icon\":\"mdi:doorbell-video\"}}";
+  int rc = postJson(HA_ACCESS_TOKEN, url.c_str(), payload.c_str());
+}
 
-  Sprintln(F("Connected to MQTT broker"));
-  
-  /*
-  if(publish(DOORBELL_TOPIC, DOORBELL_RING)){
-    Sprintln("RING! RING!");
-  }
-  */
-
+/*
+  camera.doorbell_snapshot
+  homeassistant/camera/doorbell/snapshot
+*/
+void notifyDoorbellPicture(){
   if(initCamera()){
     // take picture
     camera_fb_t *cam_frame_buf = esp_camera_fb_get();
@@ -156,40 +161,19 @@ void onMqttConnect(){
 
     Sprint("Picture size (bytes) = "); Sprintln(length);
 
-/*
-    if(publish(DOORBELL_PIC_TOPIC, String(length))){
-      delay(100);
-      mqttClient.loop();
-      delay(100);
+    String url = String(HA_BASE_URL)+"/media_source/local_source/upload";
+    int rc = postBinary(HA_ACCESS_TOKEN, url.c_str(), pic_buf, length);
 
-      publish("test/flush",String(length)); // flushes first message?
-      onMqttPublish();
-    }
-*/
-/*            
-    if(publish(DOORBELL_PIC_TOPIC, (uint8_t*)TEST_PAYLOAD, strlen(TEST_PAYLOAD))){
-      onMqttPublish();
-    }
-*/
-/*
-    if(publish(DOORBELL_PIC_TOPIC, pic_buf, length)){
-      onMqttPublish();
-    } 
-*/    
-    if(publishLarge(DOORBELL_PIC_TOPIC, pic_buf, length)){
-    //  delay(100);
-    //  mqttClient.loop();
-      delay(100);
-      onMqttPublish();
-    } 
-/*
-    if(mqttClient.publish_P(DOORBELL_PIC_TOPIC, pic_buf, length, NOT_RETAINED)){
-      onMqttPublish();
-    } 
-*/
-
-    Sprintln("Publication of picture NOT successful!");
+    //Sprintln("Publication of picture NOT successful!");
   }
+}
+
+void onNetworkConnect(){
+  //notifyDoorbellMQTT();
+  //notifyDoorbell();
+  notifyDoorbellPicture();  
+  delay(1000);
+  WiFi.disconnect(); // --> onNetworkDisconnect() --> deep_sleep()  
 }
 
 void WiFiEvent(WiFiEvent_t event) {
@@ -234,15 +218,11 @@ void WiFiEvent(WiFiEvent_t event) {
         #ifndef DISABLE_SERIAL_OUTPUT
         printNetworkDetails();
         #endif
-        if(connectMQTTBroker(DEVICE_ID, LOCAL_ENV_MQTT_USERNAME, LOCAL_ENV_MQTT_PASSWORD, DOORBELL_TOPIC, DOORBELL_SILENT)){
-          onMqttConnect();
-        }
+        onNetworkConnect();
         break;
-    // case SYSTEM_EVENT_STA_DISCONNECTED:
-    //     Serial.println("WiFi lost connection");
-    //     xTimerStop(mqttReconnectTimer, 0); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
-    //     xTimerStart(wifiReconnectTimer, 0);
-    //     break;
+    case SYSTEM_EVENT_STA_DISCONNECTED:
+        onNetworkDisconnect();
+        break;
     }
 }
 
@@ -265,12 +245,10 @@ void setup(){
   //Print the wakeup reason for ESP32 and touchpad too
   print_wakeup_reason();
   #endif
-
-  initMQTTClient(LOCAL_ENV_MQTT_BROKER_HOST, LOCAL_ENV_MQTT_BROKER_PORT);
   
   WiFi.onEvent(WiFiEvent);
 
-  connectWifi(LOCAL_ENV_WIFI_SSID, LOCAL_ENV_WIFI_PASSWORD); // --> WiFiEvent --> connectMQTTBroker() --> onMqttConnect() [take photo + publish] --> onMqttPublish() --> disconnectMQTTBroker() --> onMqttDisconnect() --> deep_sleep()
+  connectWifi(LOCAL_ENV_WIFI_SSID, LOCAL_ENV_WIFI_PASSWORD); // --> WiFiEvent --> onNetworkConnect() --> [notifyDoorbell() + notifyDoorbellPicture() --> Wifi.disconnect() --> WiFiEvent --> onNetworkDisconnect() --> deep_sleep()
 
   // this line never reached
 }
