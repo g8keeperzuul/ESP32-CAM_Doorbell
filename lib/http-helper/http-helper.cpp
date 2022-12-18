@@ -24,6 +24,8 @@ int postJson(const char* bearer_token, const char* url, const char* payload){
     return httpResponseCode;
 }
 
+//ValueError: Could not find starting boundary b'--g8keeperzuul'    <<<<< when identical to boundary
+//aiohttp.http_exceptions.InvalidHeader: 400, message='Invalid HTTP Header: --------------------------f0cda7068d225627'  <<< when extra "--" added  << required "\r\n\r\n" at end of media_content_id
 /*
     This method will to do the same thing as test/upload_doorbell_snapshot.sh
 */
@@ -34,30 +36,38 @@ int postBinary(const char* bearer_token, const char* url, uint8_t* payload, size
     httpclient.setAuthorizationType("Bearer");
     httpclient.setAuthorization(bearer_token);
     
-    httpclient.addHeader("Content-Type", "multipart/form-data; boundary=g8keeperzuul");
+    // https://www.rfc-editor.org/rfc/rfc7578.html
 
-    String head = "--g8keeperzuul\r\nContent-Disposition: form-data; media_content_id=\"media-source://media_source/doorbell/.\"; file=\"doorbell_yyyymmddThhmmss.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n";
-    String tail = "\r\n--g8keeperzuul--\r\n";
-    String postPayload = head;
+    httpclient.addHeader("Content-Type", "multipart/form-data; boundary=------------------------f0cda7068d225627");
+    //String head = "--g8keeperzuul\r\nContent-Disposition: form-data; media_content_id=\"media-source://media_source/doorbell/.\"; file=\"doorbell_yyyymmddThhmmss.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n";
+    // boundary prefixed with "--" and post-fixed with "\r\n"
+    String multipart_head = "--------------------------f0cda7068d225627\r\n\
+Content-Disposition: form-data; name=\"media_content_id\"\r\n\r\n\
+media-source://media_source/doorbell/.\r\n\
+--------------------------f0cda7068d225627\r\n\
+Content-Disposition: form-data; name=\"file\"; filename=\"doorbell_yyyymmddThhmmss.jpg\"\r\n\
+Content-Type: image/jpeg\r\n\r\n";
+    String multipart_tail = "\r\n--------------------------f0cda7068d225627--\r\n";
+    String postPayload = multipart_head;
     for (size_t n=0; n<payload_size; n=n+1024) {
       if (n+1024 < payload_size) {
-        postPayload = postPayload.concat(payload, 1024);
+        postPayload.concat(payload, 1024);
         payload += 1024;
       }
       else if (payload_size%1024>0) {
         size_t remainder = payload_size%1024;
-        postPayload = postPayload.concat(payload, remainder);
+        postPayload.concat(payload, remainder);
       }
     }   
-    postPayload = postPayload.concat(tail);    
-    
+    postPayload.concat(multipart_tail);    
+    //Sprint(postPayload);
     int httpResponseCode = httpclient.POST(postPayload);
     
     if (httpResponseCode>0) {
       Sprint("HTTP Response code: ");
       Sprintln(httpResponseCode);
-      String payload = httpclient.getString();
-      Sprintln(payload);
+      String resp = httpclient.getString();
+      Sprintln(resp);
     }
     else {
       Sprint("Error code: ");
