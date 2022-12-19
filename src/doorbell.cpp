@@ -132,25 +132,36 @@ void onNetworkDisconnect() {
 /*
   homeassistant/switch/doorbell/ringer ON
 */
+/*
 void notifyDoorbellMQTT(){
   Sprintln("RING! RING! [API->MQTT]");
   String url = String(HA_BASE_URL)+"/services/mqtt/publish";
   String payload = "{\"topic\":\"homeassistant/switch/doorbell/ringer\", \"payload\": \"ON\", \"retain\":\"False\"}";
   int rc = postJson(HA_ACCESS_TOKEN, url.c_str(), payload.c_str());
 }
+*/
 
+/*
 void notifyDoorbell(){
   Sprintln("RING! RING!");
   String url = String(HA_BASE_URL)+"/states/switch.doorbell_ringer";
   String payload = "{\"state\": \"on\", \"attributes\":{\"friendly_name\":\"Doorbell Ringer\", \"icon\":\"mdi:doorbell-video\"}}";
   int rc = postJson(HA_ACCESS_TOKEN, url.c_str(), payload.c_str());
 }
+*/
+
+bool displayDoorbellSnapshot(String snapshot_filename){
+  Sprintln("Updating doorbell snapshot...");  
+  String url = String(HA_BASE_URL)+"/services/local_file/update_file_path";
+  String payload = "{ \"entity_id\": \""+String(CAMERA_ENTITY_ID)+"\", \"file_path\": \""+String(MEDIA_DIRS_VAL)+"/"+snapshot_filename+"\"}";
+  return postJson(HA_ACCESS_TOKEN, url.c_str(), payload.c_str());
+}
 
 /*
-  camera.doorbell_snapshot
-  homeassistant/camera/doorbell/snapshot
+  Take a picture and upload it to Home Assistant via the media-browser.
+  Location of snapshot determined by MEDIA_DIRS_KEY.  
 */
-void notifyDoorbellPicture(){
+bool uploadDoorbellPicture(String snapshot_filename){
   if(initCamera()){
     // take picture
     camera_fb_t *cam_frame_buf = esp_camera_fb_get();
@@ -159,19 +170,31 @@ void notifyDoorbellPicture(){
     uint8_t* pic_buf = cam_frame_buf->buf;
     size_t length = cam_frame_buf->len;
 
-    Sprint("Picture size (bytes) = "); Sprintln(length);
+    Sprintln("Uploading snapshot "+snapshot_filename);
+    Sprint("Image size (bytes) = "); Sprintln(length);
 
     String url = String(HA_BASE_URL)+"/media_source/local_source/upload";
-    int rc = postBinary(HA_ACCESS_TOKEN, url.c_str(), pic_buf, length);
-
-    //Sprintln("Publication of picture NOT successful!");
+    return postBinary(HA_ACCESS_TOKEN, url.c_str(), MEDIA_DIRS_KEY, snapshot_filename, pic_buf, length);
+  }
+  else
+  {
+    return false;
   }
 }
 
+String getSnapshotFilename(){
+  return "doorbell_yyyymmddThhmmss.jpg";
+}
+
 void onNetworkConnect(){
-  //notifyDoorbellMQTT();
-  //notifyDoorbell();
-  notifyDoorbellPicture();  
+    
+  String snapshot_filename = getSnapshotFilename();
+  if(uploadDoorbellPicture(snapshot_filename)){
+    if(!displayDoorbellSnapshot(snapshot_filename)){
+      Sprintln("Failed to display latest snapshot after successful upload!");
+    }
+  }
+  
   delay(1000);
   WiFi.disconnect(); // --> onNetworkDisconnect() --> deep_sleep()  
 }
@@ -248,9 +271,9 @@ void setup(){
   
   WiFi.onEvent(WiFiEvent);
 
-  connectWifi(LOCAL_ENV_WIFI_SSID, LOCAL_ENV_WIFI_PASSWORD); // --> WiFiEvent --> onNetworkConnect() --> [notifyDoorbell() + notifyDoorbellPicture() --> Wifi.disconnect() --> WiFiEvent --> onNetworkDisconnect() --> deep_sleep()
+  connectWifi(LOCAL_ENV_WIFI_SSID, LOCAL_ENV_WIFI_PASSWORD); // --> WiFiEvent --> onNetworkConnect() --> [uploadDoorbellPicture() + displayDoorbellSnapshot() --> Wifi.disconnect()] --> WiFiEvent --> onNetworkDisconnect() --> deep_sleep()
 
-  // this line never reached
+  // This line never reached
 }
 
 void loop(){

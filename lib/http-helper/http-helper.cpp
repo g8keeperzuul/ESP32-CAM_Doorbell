@@ -1,6 +1,6 @@
 #include "http-helper.h"
 
-int postJson(const char* bearer_token, const char* url, const char* payload){
+bool postJson(const char* bearer_token, const char* url, const char* payload){
     httpclient.begin(wificlient, url);
 
     httpclient.setAuthorizationType("Bearer");
@@ -21,7 +21,13 @@ int postJson(const char* bearer_token, const char* url, const char* payload){
     }  
 
     httpclient.end();
-    return httpResponseCode;
+    if(httpResponseCode >= 200 && httpResponseCode < 300)
+    {
+        return true;
+    }
+    else{
+        return false;
+    }    
 }
 
 //ValueError: Could not find starting boundary b'--g8keeperzuul'    <<<<< when identical to boundary
@@ -29,7 +35,7 @@ int postJson(const char* bearer_token, const char* url, const char* payload){
 /*
     This method will to do the same thing as test/upload_doorbell_snapshot.sh
 */
-int postBinary(const char* bearer_token, const char* url, uint8_t* payload, size_t payload_size){
+bool postBinary(const char* bearer_token, const char* url, String media_dirs_key, String filename, uint8_t* payload, size_t payload_size){
     
     httpclient.begin(wificlient, url);
     
@@ -76,5 +82,11 @@ Content-Type: image/jpeg\r\n\r\n";
 
     // Free resources
     httpclient.end();
-    return httpResponseCode;
+    if(httpResponseCode == 200)
+    {
+        return true;
+    }
+    else{
+        return false;
+    }
 }
