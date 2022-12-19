@@ -22,6 +22,10 @@ HTTPClient httpclient;
 RTC_DATA_ATTR int bootCount = 0;
 touch_pad_t touchPin;
 
+// Time
+const char* ntpServer = NTP_SERVER;
+RTC_DATA_ATTR bool time_is_set = false;
+
 #ifndef DISABLE_SERIAL_OUTPUT
 /*
 Method to print the touchpad by which ESP32
@@ -182,20 +186,39 @@ bool uploadDoorbellPicture(String snapshot_filename){
   }
 }
 
-String getSnapshotFilename(){
-  return "doorbell_yyyymmddThhmmss.jpg";
-}
-
 void onNetworkConnect(){
-    
-  String snapshot_filename = getSnapshotFilename();
+  
+  char snapshot_filename[40];
+
+  if(!time_is_set){
+    Sprintln("Setting clock...");
+    //configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);  
+    // Just set UTC time since timezone info is lost during deep sleep (getLocalTime() was returning UTC)
+    configTime(0, 0, ntpServer);  
+  }
+
+  // set timezone before querying time
+  int rcode = setenv("TZ", TIMEZONE, 1);
+  tzset();  
+
+  struct tm timeinfo;
+  if(getLocalTime(&timeinfo)){
+    time_is_set = true;
+    Sprintln(asctime(&timeinfo));
+   
+    strftime(snapshot_filename, 40, "doorbell_snapshot_%Y%m%dT%H%M%S.jpg", &timeinfo);    
+    //snapshot_filename = "doorbell_snapshot_yyyymmddThhmmss.jpg";
+  }
+  else{
+    strcpy(snapshot_filename, "doorbell_snapshot.jpg");
+  }
+
   if(uploadDoorbellPicture(snapshot_filename)){
     if(!displayDoorbellSnapshot(snapshot_filename)){
       Sprintln("Failed to display latest snapshot after successful upload!");
     }
   }
-  
-  delay(1000);
+
   WiFi.disconnect(); // --> onNetworkDisconnect() --> deep_sleep()  
 }
 

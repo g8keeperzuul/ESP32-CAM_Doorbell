@@ -12,6 +12,7 @@
 #include "cam-helper.h"
 #include "soc/soc.h"            // brownout detector
 #include "soc/rtc_cntl_reg.h"   // brownout detector
+#include "time.h"
 
 #define DEVICE_ID           "esp32-cam"
 #define DEVICE_NAME         "Doorbell"
