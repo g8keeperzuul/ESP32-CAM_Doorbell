@@ -15,6 +15,7 @@ https://diyi0t.com/best-battery-for-esp32/
 WiFiClient wificlient;
 HTTPClient httpclient;
 
+
 #define TOUCH_SENSITIVITY_THRESHOLD 40 /* Greater the value, more the sensitivity */
 
 // You can save data in the ESP32’s RTC memory (16kB? SRAM) which is not erased during deep sleep. However, it is erased when the ESP32 is reset.
@@ -118,6 +119,8 @@ void deep_sleep()
   Serial.flush();
   #endif
 
+  sleepFlash();
+
   //esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF); // 2.8mA
 
   esp_deep_sleep_start();
@@ -167,8 +170,13 @@ bool displayDoorbellSnapshot(String snapshot_filename){
 */
 bool uploadDoorbellPicture(String snapshot_filename){
   if(initCamera()){
-    // take picture
+    // do not use flash since the flash LED cannot be fully turned off when in deep sleep
+    initFlash(false);
+
+    // take picture    
+    flashOn();
     camera_fb_t *cam_frame_buf = esp_camera_fb_get();
+    flashOff();
 
     // send picture
     uint8_t* pic_buf = cam_frame_buf->buf;

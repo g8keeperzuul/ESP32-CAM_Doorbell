@@ -41,19 +41,18 @@ bool postBinary(const char* bearer_token, const char* url, String media_dirs_key
     
     httpclient.setAuthorizationType("Bearer");
     httpclient.setAuthorization(bearer_token);
-    
-    // https://www.rfc-editor.org/rfc/rfc7578.html
 
-    httpclient.addHeader("Content-Type", "multipart/form-data; boundary=------------------------f0cda7068d225627");
-    //String head = "--g8keeperzuul\r\nContent-Disposition: form-data; media_content_id=\"media-source://media_source/doorbell/.\"; file=\"doorbell_yyyymmddThhmmss.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n";
-    // boundary prefixed with "--" and post-fixed with "\r\n"
-    String multipart_head = "--------------------------f0cda7068d225627\r\n\
+    // https://www.rfc-editor.org/rfc/rfc7578.html
+    httpclient.addHeader("Content-Type", "multipart/form-data; boundary=g8keeperzuul");    // boundary prefixed with "--" and post-fixed with "\r\n"    
+
+    // double CRLF necessary after "media_content_id"!
+    String multipart_head = "--g8keeperzuul\r\n\
 Content-Disposition: form-data; name=\"media_content_id\"\r\n\r\n\
-media-source://media_source/doorbell/.\r\n\
---------------------------f0cda7068d225627\r\n\
-Content-Disposition: form-data; name=\"file\"; filename=\"doorbell_yyyymmddThhmmss.jpg\"\r\n\
+media-source://media_source/"+media_dirs_key+"/.\r\n\
+--g8keeperzuul\r\n\
+Content-Disposition: form-data; name=\"file\"; filename=\""+filename+"\"\r\n\
 Content-Type: image/jpeg\r\n\r\n";
-    String multipart_tail = "\r\n--------------------------f0cda7068d225627--\r\n";
+    String multipart_tail = "\r\n--g8keeperzuul--\r\n";
     String postPayload = multipart_head;
     for (size_t n=0; n<payload_size; n=n+1024) {
       if (n+1024 < payload_size) {

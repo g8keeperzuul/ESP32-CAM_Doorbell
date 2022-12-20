@@ -18,6 +18,6 @@
 #define DEVICE_NAME         "Doorbell"
 #define DEVICE_MANUFACTURER "Ai Thinker"
 #define DEVICE_MODEL        "ESP32-CAM"
-#define DEVICE_VERSION      "20221216.1500"
+#define DEVICE_VERSION      "20221219.2100"
 
 #endif
