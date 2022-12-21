@@ -100,6 +100,10 @@ get_deviceType();
 Serial.println(deviceType);
 */
 
+/*
+  Not need for any logic here since the touch will wake up the device.
+  During wake up, the code will execute from the beginning at setup().
+*/
 void onTouch(){
   //placeholder callback function
   Sprintln("DING DONG!");
@@ -171,7 +175,7 @@ bool displayDoorbellSnapshot(String snapshot_filename){
 bool uploadDoorbellPicture(String snapshot_filename){
   if(initCamera()){
     // do not use flash since the flash LED cannot be fully turned off when in deep sleep
-    initFlash(false);
+    initFlash(ENABLE_FLASH);
 
     // take picture    
     flashOn();

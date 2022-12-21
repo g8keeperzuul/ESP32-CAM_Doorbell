@@ -33,6 +33,9 @@
 // The entity_id is created from the name
 #define CAMERA_ENTITY_ID "camera.doorbell_snapshot"
 
+// Use flash when taking snapshot
+#define ENABLE_FLASH false
+
 // https://www.gnu.org/software/libc/manual/html_node/TZ-Variable.html
 #define TIMEZONE "UTC0"
 
