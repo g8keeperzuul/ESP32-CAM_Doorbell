@@ -15,42 +15,16 @@ https://diyi0t.com/best-battery-for-esp32/
 WiFiClient wificlient;
 HTTPClient httpclient;
 
-
-#define TOUCH_SENSITIVITY_THRESHOLD 40 /* Greater the value, more the sensitivity */
-
 // You can save data in the ESP32’s RTC memory (16kB? SRAM) which is not erased during deep sleep. However, it is erased when the ESP32 is reset.
 // To use the data after reboot, store it in RTC memory by defining a global variable with RTC_DATA_ATTR attribute.
 RTC_DATA_ATTR int bootCount = 0;
-touch_pad_t touchPin;
 
 // Time
 const char* ntpServer = NTP_SERVER;
 RTC_DATA_ATTR bool time_is_set = false;
 
 #ifndef DISABLE_SERIAL_OUTPUT
-/*
-Method to print the touchpad by which ESP32
-has been awaken from sleep
-*/
-void print_wakeup_touchpad(){
-  touchPin = esp_sleep_get_touchpad_wakeup_status();
 
-  Sprint("Touch detected on ");
-  switch(touchPin)
-  {
-    case 0  : Sprintln("GPIO 4"); break;
-    case 1  : Sprintln("GPIO 0"); break;
-    case 2  : Sprintln("GPIO 2"); break;
-    case 3  : Sprintln("GPIO 15"); break;
-    case 4  : Sprintln("GPIO 13"); break;
-    case 5  : Sprintln("GPIO 12"); break;
-    case 6  : Sprintln("GPIO 14"); break;
-    case 7  : Sprintln("GPIO 27"); break;
-    case 8  : Sprintln("GPIO 33"); break;
-    case 9  : Sprintln("GPIO 32"); break;
-    default : Sprintln("UNKNOWN!"); break;
-  }
-}
 
 /*
 Method to print the reason by which ESP32
@@ -65,66 +39,50 @@ void print_wakeup_reason(){
   switch(wakeup_reason)
   {
     case ESP_SLEEP_WAKEUP_EXT0 : Sprintln("external signal using RTC_IO"); break;
-    case ESP_SLEEP_WAKEUP_EXT1 : Sprintln("external signal using RTC_CNTL"); break;
+    case ESP_SLEEP_WAKEUP_EXT1 : {
+      Sprintln("external signal using RTC_CNTL"); 
+      uint64_t ext1_status = esp_sleep_get_ext1_wakeup_status();
+      int gpio_pin = log(ext1_status)/log(2);
+      Sprint("\twake on GPIO #"); Sprintln(gpio_pin);
+      break; }
     case ESP_SLEEP_WAKEUP_TIMER : Sprintln("timer"); break;
-    case ESP_SLEEP_WAKEUP_TOUCHPAD : Sprintln("touchpad"); 
-      print_wakeup_touchpad();
-      break;
+    case ESP_SLEEP_WAKEUP_TOUCHPAD : Sprintln("touchpad"); break;
     case ESP_SLEEP_WAKEUP_ULP : Sprintln("ULP program"); break;
     default : Sprintln(wakeup_reason); break;
   }
 }
 #endif
 
-/*
-//get unique deviceId, it contains the MAC address in reverse order
-//later also get the device type and Rev
 
-void get_deviceId() {
-  uint64_t chipid = ESP.getEfuseMac(); // The chip ID is essentially its MAC address(length: 6 bytes).
+void get_ESP32_info(){
+  #ifndef DISABLE_SERIAL_OUTPUT
+  Serial.printf("ESP32 Chip model = %s Rev %d\n", ESP.getChipModel(), ESP.getChipRevision()); 
+  Serial.printf("This chip has %d cores\n", ESP.getChipCores());
+
+  // The chip ID is essentially its MAC address(length: 6 bytes)
+  // unique deviceId, it contains the MAC address in reverse order
+  uint64_t chipid = ESP.getEfuseMac(); 
+  char deviceId[25];
   snprintf(deviceId, 23, "%04X%08X", (uint16_t)(chipid >> 32), (uint32_t)chipid);
+  Serial.print("Chip ID: "); Serial.println(deviceId);
+  #endif
 }
 
-void get_deviceType() {
-  snprintf(deviceType, 23, "ESP32", "", "");
-}
-
-//  Serial.printf("ESP32 Chip model = %s Rev %d\n", ESP.getChipModel(), ESP.getChipRevision());   //ESP.getChipModel() 
-
-//  Serial.printf("This chip has %d cores\n", ESP.getChipCores());
-//  Serial.print("Chip ID: "); Serial.println(chipId2);
-
-get_deviceId();
-Serial.println(deviceId);
-get_deviceType();
-Serial.println(deviceType);
-*/
-
-/*
-  Not need for any logic here since the touch will wake up the device.
-  During wake up, the code will execute from the beginning at setup().
-*/
-void onTouch(){
-  //placeholder callback function
-  Sprintln("DING DONG!");
-}
 
 //Go to sleep now, wake up with touch interrupt
 void deep_sleep()
 {
-  //Setup interrupt on Touch Pad 5 (GPIO12) (cannot use SD card)
-  touchAttachInterrupt(T5, onTouch, TOUCH_SENSITIVITY_THRESHOLD);
+  sleepFlash();
 
-  //Configure Touchpad as wakeup source
-  esp_sleep_enable_touchpad_wakeup();
+  // Configure one or more GPIO as wakeup source
+  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK,ESP_EXT1_WAKEUP_ANY_HIGH);
 
   Sprintln("Awake for " + String( millis() ) + "ms. Back to sleep...");
   #ifndef DISABLE_SERIAL_OUTPUT
   Serial.flush();
   #endif
 
-  sleepFlash();
-
+  // Powering off peripherals can not be done if using pull-up/down on GPIO
   //esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF); // 2.8mA
 
   esp_deep_sleep_start();
@@ -292,8 +250,10 @@ void setup(){
   #ifndef DISABLE_SERIAL_OUTPUT
   Serial.begin(9600);
   //Serial.setDebugOutput(true);
-  delay(1000); //Take some time to open up the Serial Monitor
+  delay(100); //Take some time to open up the Serial Monitor
   #endif
+
+  //get_ESP32_info();
 
   //Increment boot number and print it every reboot
   ++bootCount;
@@ -306,7 +266,7 @@ void setup(){
   
   WiFi.onEvent(WiFiEvent);
 
-  connectWifi(LOCAL_ENV_WIFI_SSID, LOCAL_ENV_WIFI_PASSWORD); // --> WiFiEvent --> onNetworkConnect() --> [uploadDoorbellPicture() + displayDoorbellSnapshot() --> Wifi.disconnect()] --> WiFiEvent --> onNetworkDisconnect() --> deep_sleep()
+  connectWifi(LOCAL_ENV_WIFI_SSID, LOCAL_ENV_WIFI_PASSWORD); // --> WiFiEvent --> onNetworkConnect() --> [uploadDoorbellPicture() + displayDoorbellSnapshot() + Wifi.disconnect()] --> WiFiEvent --> onNetworkDisconnect() --> deep_sleep()
 
   // This line never reached
 }
