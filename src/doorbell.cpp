@@ -75,7 +75,7 @@ void deep_sleep()
   sleepFlash();
 
   // Configure one or more GPIO as wakeup source
-  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK,ESP_EXT1_WAKEUP_ANY_HIGH);
+  esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK,ESP_EXT1_WAKEUP_ANY_HIGH); // button must be pull-down
 
   Sprintln("Awake for " + String( millis() ) + "ms. Back to sleep...");
   #ifndef DISABLE_SERIAL_OUTPUT
