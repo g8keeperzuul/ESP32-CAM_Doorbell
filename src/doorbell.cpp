@@ -84,6 +84,12 @@ void deep_sleep()
 
   // Powering off peripherals can not be done if using pull-up/down on GPIO
   //esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF); // 2.8mA
+  
+  // Doesn't seem to work - expected EN_PIN to remain low, but as soon as deep sleep occurred state was high, 
+  // so S_PIN was reading a (divided) battery voltage.
+  // Desired state is to keep EN_PIN low during deep sleep, so that there is 0 volts on S_PIN
+  // This was accomplished with an external pull down resistor on EN_PIN.
+  //gpio_deep_sleep_hold_en(); // gpio current state should be held during sleep
 
   esp_deep_sleep_start();
 }
@@ -153,6 +159,20 @@ bool uploadDoorbellPicture(String snapshot_filename){
   else
   {
     return false;
+  }
+}
+
+/*
+  Toggle ON/OFF switch to test battery voltage
+*/
+void enableBatterySample(bool enabled){
+  if(enabled){    
+    digitalWrite(EN_PIN, HIGH);
+    Sprintln("Battery sample ENABLED");
+  }
+  else{
+    digitalWrite(EN_PIN, LOW);
+    Sprintln("Battery sample DISABLED");
   }
 }
 
@@ -242,10 +262,46 @@ void WiFiEvent(WiFiEvent_t event) {
     }
 }
 
+// Calculate battery level as percentage
+float getBatteryLevel(uint32_t sample_mv){
+  return ((1.0 - ((ADJ_MAX_BATT - sample_mv)/((ADJ_MAX_BATT - ADJ_MIN_BATT)/1.0))) * 100.0);
+}
+
+uint32_t getActualBatteryVoltage(uint32_t sample_mv){
+  return (uint32_t)((sample_mv*(R1 + R2))/R1);
+}
+
+uint32_t sampleBatteryVoltage(){  
+  const int SAMPLES = 12;
+  uint32_t sum = 0;
+  uint32_t highest = 0;
+  uint32_t lowest = 5000; // samples will always be < 3300 (3.3V)
+  Sprintln("Sampling battery voltage (mV)...");
+  for(int i=0; i<SAMPLES; i++){    
+    uint32_t sample = analogReadMilliVolts(S_PIN);
+    if(sample > highest){
+      highest = sample;
+    }
+    if(sample < lowest){
+      lowest = sample;
+    }
+    Sprintln(sample);
+    sum = sum + sample;
+  }
+  // remove outliers
+  sum = sum - highest;
+  sum = sum - lowest;
+  Sprint("Dropping "); Sprintln(highest);
+  Sprint("Dropping "); Sprintln(lowest);
+  return sum/(SAMPLES - 2);
+}
+
 
 void setup(){
 
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout detector
+
+  pinMode(EN_PIN, OUTPUT);
 
   #ifndef DISABLE_SERIAL_OUTPUT
   Serial.begin(9600);
@@ -264,6 +320,30 @@ void setup(){
   print_wakeup_reason();
   #endif
   
+  // measure battery voltage
+  // do this before wifi is enabled since ADC2 used to sample battery voltage is also used by wifi
+  enableBatterySample(true);
+
+  //delay(10000);
+  Sprint("ADJ_MAX_BATT = "); Sprintln(ADJ_MAX_BATT);
+  Sprint("ADJ_MIN_BATT = "); Sprintln(ADJ_MIN_BATT);
+  
+  analogReadResolution(12);
+  uint16_t batt = analogRead(S_PIN);
+  Sprint("battery ADC = "); Sprintln(batt);
+
+  uint32_t adj_batt_mv = sampleBatteryVoltage(); //analogReadMilliVolts(S_PIN);  
+  Sprint("adjusted millivolts = "); Sprintln(adj_batt_mv);
+
+  uint32_t batt_mv = getActualBatteryVoltage(adj_batt_mv);
+  Sprint("actual millivolts = "); Sprintln(batt_mv);
+
+  float batt_level = getBatteryLevel(adj_batt_mv);
+  Sprint("level = "); Sprintln(batt_level);
+
+  enableBatterySample(false); // not strictly necessary since during deep sleep HIGH will be forgotten and an external pull down resistor will disable the battery sample circuit
+
+
   WiFi.onEvent(WiFiEvent);
 
   connectWifi(LOCAL_ENV_WIFI_SSID, LOCAL_ENV_WIFI_PASSWORD); // --> WiFiEvent --> onNetworkConnect() --> [uploadDoorbellPicture() + displayDoorbellSnapshot() + Wifi.disconnect()] --> WiFiEvent --> onNetworkDisconnect() --> deep_sleep()
