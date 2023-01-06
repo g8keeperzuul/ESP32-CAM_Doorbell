@@ -23,6 +23,9 @@ RTC_DATA_ATTR int bootCount = 0;
 const char* ntpServer = NTP_SERVER;
 RTC_DATA_ATTR bool time_is_set = false;
 
+// Data file contents to be uploaded
+String json_data;
+
 #ifndef DISABLE_SERIAL_OUTPUT
 
 
@@ -101,30 +104,9 @@ void onNetworkDisconnect() {
 }
 
 /*
+  Call a Home Assistant service to update the local_file attribute of a camera entity to display the latest snapshot.
   https://developers.home-assistant.io/docs/api/rest/
 */
-
-/*
-  homeassistant/switch/doorbell/ringer ON
-*/
-/*
-void notifyDoorbellMQTT(){
-  Sprintln("RING! RING! [API->MQTT]");
-  String url = String(HA_BASE_URL)+"/services/mqtt/publish";
-  String payload = "{\"topic\":\"homeassistant/switch/doorbell/ringer\", \"payload\": \"ON\", \"retain\":\"False\"}";
-  int rc = postJson(HA_ACCESS_TOKEN, url.c_str(), payload.c_str());
-}
-*/
-
-/*
-void notifyDoorbell(){
-  Sprintln("RING! RING!");
-  String url = String(HA_BASE_URL)+"/states/switch.doorbell_ringer";
-  String payload = "{\"state\": \"on\", \"attributes\":{\"friendly_name\":\"Doorbell Ringer\", \"icon\":\"mdi:doorbell-video\"}}";
-  int rc = postJson(HA_ACCESS_TOKEN, url.c_str(), payload.c_str());
-}
-*/
-
 bool displayDoorbellSnapshot(String snapshot_filename){
   Sprintln("Updating doorbell snapshot...");  
   String url = String(HA_BASE_URL)+"/services/local_file/update_file_path";
@@ -136,7 +118,7 @@ bool displayDoorbellSnapshot(String snapshot_filename){
   Take a picture and upload it to Home Assistant via the media-browser.
   Location of snapshot determined by MEDIA_DIRS_KEY.  
 */
-bool uploadDoorbellPicture(String snapshot_filename){
+bool uploadDoorbellPictureAndData(String snapshot_filename, String json_data){
   if(initCamera()){
     // do not use flash since the flash LED cannot be fully turned off when in deep sleep
     initFlash(ENABLE_FLASH);
@@ -154,7 +136,7 @@ bool uploadDoorbellPicture(String snapshot_filename){
     Sprint("Image size (bytes) = "); Sprintln(length);
 
     String url = String(HA_BASE_URL)+"/media_source/local_source/upload";
-    return postBinary(HA_ACCESS_TOKEN, url.c_str(), MEDIA_DIRS_KEY, snapshot_filename, pic_buf, length);
+    return postMultifile(HA_ACCESS_TOKEN, url.c_str(), MEDIA_DIRS_KEY, snapshot_filename, pic_buf, length, DATA_FILENAME, json_data);
   }
   else
   {
@@ -203,7 +185,7 @@ void onNetworkConnect(){
     strcpy(snapshot_filename, "doorbell_snapshot.jpg");
   }
 
-  if(uploadDoorbellPicture(snapshot_filename)){
+  if(uploadDoorbellPictureAndData(snapshot_filename, json_data)){
     if(!displayDoorbellSnapshot(snapshot_filename)){
       Sprintln("Failed to display latest snapshot after successful upload!");
     }
@@ -330,7 +312,7 @@ void setup(){
   
   analogReadResolution(12);
   uint16_t batt = analogRead(S_PIN);
-  Sprint("battery ADC = "); Sprintln(batt);
+  Sprint("battery ADC = "); Sprintln(batt); // not used
 
   uint32_t adj_batt_mv = sampleBatteryVoltage(); //analogReadMilliVolts(S_PIN);  
   Sprint("adjusted millivolts = "); Sprintln(adj_batt_mv);
@@ -343,10 +325,12 @@ void setup(){
 
   enableBatterySample(false); // not strictly necessary since during deep sleep HIGH will be forgotten and an external pull down resistor will disable the battery sample circuit
 
+  // global var; battery needs to be tested before wifi activated
+  json_data = "{\"battery_level\": "+String(batt_level,1)+", \"battery_mv\": "+String(batt_mv)+", \"count\": "+String(bootCount)+"}";
 
   WiFi.onEvent(WiFiEvent);
 
-  connectWifi(LOCAL_ENV_WIFI_SSID, LOCAL_ENV_WIFI_PASSWORD); // --> WiFiEvent --> onNetworkConnect() --> [uploadDoorbellPicture() + displayDoorbellSnapshot() + Wifi.disconnect()] --> WiFiEvent --> onNetworkDisconnect() --> deep_sleep()
+  connectWifi(LOCAL_ENV_WIFI_SSID, LOCAL_ENV_WIFI_PASSWORD); // --> WiFiEvent --> onNetworkConnect() --> [uploadDoorbellPictureAndData() + displayDoorbellSnapshot() + Wifi.disconnect()] --> WiFiEvent --> onNetworkDisconnect() --> deep_sleep()
 
   // This line never reached
 }

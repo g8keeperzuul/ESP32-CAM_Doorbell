@@ -33,12 +33,14 @@
 #define MAX_BATT 3740 // millivolts when battery fully charged
 #define MIN_BATT 3000 // millivolts when battery considered completely discharged
 
-// Voltage divider used to reduce battery max voltage of 3.74V to <= 3.3V
+// Voltage divider used to reduce battery max voltage of 3.74V to <= 3.3V (actually 3.1V)
 // voltage divider resistors
 #define R1 98400 // ohms
 #define R2 20315 // ohms
 
 #define ADJ_MAX_BATT ((MAX_BATT * R1)/(R1 + R2)) // millivolts; max voltage after voltage divider; MUST be <=3.3 
 #define ADJ_MIN_BATT ((MIN_BATT * R1)/(R1 + R2)) // millivolts
+
+#define DATA_FILENAME "doorbell_metadata.json"
 
 #endif
