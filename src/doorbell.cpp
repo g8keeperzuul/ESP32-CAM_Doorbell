@@ -118,7 +118,7 @@ bool displayDoorbellSnapshot(String snapshot_filename){
   Take a picture and upload it to Home Assistant via the media-browser.
   Location of snapshot determined by MEDIA_DIRS_KEY.  
 */
-bool uploadDoorbellPictureAndData(String snapshot_filename, String json_data){
+bool uploadDoorbellPicture(String snapshot_filename){
   if(initCamera()){
     // do not use flash since the flash LED cannot be fully turned off when in deep sleep
     initFlash(ENABLE_FLASH);
@@ -136,7 +136,7 @@ bool uploadDoorbellPictureAndData(String snapshot_filename, String json_data){
     Sprint("Image size (bytes) = "); Sprintln(length);
 
     String url = String(HA_BASE_URL)+"/media_source/local_source/upload";
-    return postMultifile(HA_ACCESS_TOKEN, url.c_str(), MEDIA_DIRS_KEY, snapshot_filename, pic_buf, length, DATA_FILENAME, json_data);
+    return postBinary(HA_ACCESS_TOKEN, url.c_str(), MEDIA_DIRS_KEY, snapshot_filename, pic_buf, length);
   }
   else
   {
@@ -185,7 +185,7 @@ void onNetworkConnect(){
     strcpy(snapshot_filename, "doorbell_snapshot.jpg");
   }
 
-  if(uploadDoorbellPictureAndData(snapshot_filename, json_data)){
+  if(uploadDoorbellPicture(snapshot_filename)){
     if(!displayDoorbellSnapshot(snapshot_filename)){
       Sprintln("Failed to display latest snapshot after successful upload!");
     }
