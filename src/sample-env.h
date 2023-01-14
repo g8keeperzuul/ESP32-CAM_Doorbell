@@ -32,6 +32,7 @@
 //
 // The entity_id is created from the name
 #define CAMERA_ENTITY_ID "camera.doorbell_snapshot"
+#define SENSOR_ENTITY_ID "sensor.doorbell_battery"
 
 // Use flash when taking snapshot
 #define ENABLE_FLASH false

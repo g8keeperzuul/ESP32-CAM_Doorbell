@@ -25,6 +25,8 @@
 //#define BUTTON_PIN_BITMASK 0x1000 // pin 12 = 2^12 = 0x1000 in hex
 #define BUTTON_PIN_BITMASK (1<<12) // same as 2^12; (1<<12 | 1<<13) same as 2^12 + 2^13
 
+//#define DISABLE_BATTERY_TEST 1
+
 // used for battery level test
 #define EN_PIN GPIO_NUM_2 // enable battery sample (to be used for digital out)
 #define S_PIN GPIO_NUM_13  // battery sample (to be used for analog in)
@@ -40,7 +42,5 @@
 
 #define ADJ_MAX_BATT ((MAX_BATT * R1)/(R1 + R2)) // millivolts; max voltage after voltage divider; MUST be <=3.3 
 #define ADJ_MIN_BATT ((MIN_BATT * R1)/(R1 + R2)) // millivolts
-
-#define DATA_FILENAME "doorbell_metadata.json"
 
 #endif

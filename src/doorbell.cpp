@@ -103,6 +103,12 @@ void onNetworkDisconnect() {
   deep_sleep();
 }
 
+bool sendDoorbellBatteryMetadata(){
+  Sprintln("Updating doorbell battery metadata...");  
+  String url = String(HA_BASE_URL)+"/states/"+String(SENSOR_ENTITY_ID);  
+  return postJson(HA_ACCESS_TOKEN, url.c_str(), json_data.c_str());  
+}
+
 /*
   Call a Home Assistant service to update the local_file attribute of a camera entity to display the latest snapshot.
   https://developers.home-assistant.io/docs/api/rest/
@@ -190,6 +196,11 @@ void onNetworkConnect(){
       Sprintln("Failed to display latest snapshot after successful upload!");
     }
   }
+
+  #ifndef DISABLE_BATTERY_TEST
+  // battery metadata (json_data) already collected before wifi was activated
+  sendDoorbellBatteryMetadata();
+  #endif
 
   WiFi.disconnect(); // --> onNetworkDisconnect() --> deep_sleep()  
 }
@@ -302,11 +313,11 @@ void setup(){
   print_wakeup_reason();
   #endif
   
+  #ifndef DISABLE_BATTERY_TEST
   // measure battery voltage
   // do this before wifi is enabled since ADC2 used to sample battery voltage is also used by wifi
   enableBatterySample(true);
-
-  //delay(10000);
+  
   Sprint("ADJ_MAX_BATT = "); Sprintln(ADJ_MAX_BATT);
   Sprint("ADJ_MIN_BATT = "); Sprintln(ADJ_MIN_BATT);
   
@@ -325,12 +336,23 @@ void setup(){
 
   enableBatterySample(false); // not strictly necessary since during deep sleep HIGH will be forgotten and an external pull down resistor will disable the battery sample circuit
 
-  // global var; battery needs to be tested before wifi activated
-  json_data = "{\"battery_level\": "+String(batt_level,1)+", \"battery_mv\": "+String(batt_mv)+", \"count\": "+String(bootCount)+"}";
+  // Global var; battery needs to be tested before wifi activated
+  // This payload is sent by sendDoorbellBatteryMetadata()
+  // '{"state": 76.7, "attributes":{"batt_mv": 3567, "boot_count": 14 }}'
+  // This extended payload with additional metada should not be necessary as these details can be provided by
+  // HA configuration.yaml ->
+  // customize:
+  //    sensor.doorbell_battery:
+  //    friendly_name: Doorbell Battery
+  //    unit_of_measurement: "%"
+  //    icon: "mdi:battery-50"
+  // '{"state": 76.7, "attributes":{"friendly_name": "Doorbell Battery Level", "unit_of_measurement": "%", "icon": "mdi:battery-50", "batt_mv": 3567, "boot_count": 14 }}'
+  json_data = "{\"state\": "+String(batt_level,1)+", \"attributes\":{ \"friendly_name\": \"Doorbell Battery Level\", \"unit_of_measurement\": \"%\", \"icon\": \"mdi:battery-50\", \"batt_mv\": "+String(batt_mv)+", \"boot_count\": "+String(bootCount)+" }}"; 
+  #endif
 
   WiFi.onEvent(WiFiEvent);
 
-  connectWifi(LOCAL_ENV_WIFI_SSID, LOCAL_ENV_WIFI_PASSWORD); // --> WiFiEvent --> onNetworkConnect() --> [uploadDoorbellPictureAndData() + displayDoorbellSnapshot() + Wifi.disconnect()] --> WiFiEvent --> onNetworkDisconnect() --> deep_sleep()
+  connectWifi(LOCAL_ENV_WIFI_SSID, LOCAL_ENV_WIFI_PASSWORD); // --> WiFiEvent --> onNetworkConnect() --> [uploadDoorbellPicture() + displayDoorbellSnapshot() + sendDoorbellBatteryMetadata() + Wifi.disconnect()] --> WiFiEvent --> onNetworkDisconnect() --> deep_sleep()
 
   // This line never reached
 }
