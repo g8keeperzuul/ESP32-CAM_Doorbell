@@ -1,6 +1,6 @@
 # ESP32-CAM Doorbell with Home Assistant Integration 
 
-The full project is actually two separate projects: the doorbell itself and a separate buzzer. 
+The full project is actually two separate projects: the doorbell itself and a separate buzzer. This project just describes the picture-taking doorbell.
 
 The doorbell is based on an ESP32-CAM. The doorbell is battery powered since typically an electrical plug outside near the front door may not exist. So the device is mostly sleeping. When the button is pressed, it wakes up and performs the following:
 
@@ -131,10 +131,12 @@ Notice that the file_path parameter uses the actual filesystem location and not 
 
 Finally, if the optional battery test is included, then the results of that are sent to HA.
 
+![doorbell battery](doc/doorbell-battery-ha.png)
+
 HTTP post to /api/states/sensor.doorbell_battery
 with payload
 ```
-{"state": 86.7, "attributes":{"friendly_name": "Doorbell Battery Level", "unit_of_measurement": "%", "icon": "mdi:battery-50", "batt_mv": 3567, "boot_count": 14 }}
+{"state": 79.28, "attributes":{"friendly_name": "Doorbell Battery Level", "unit_of_measurement": "%", "icon": "mdi:battery-50", "batt_mv": 3585, "boot_count": 2 }}
 ```
 
 The **sensor.doorbell_battery** does not need to be predefined in HA's configuration.yaml.
