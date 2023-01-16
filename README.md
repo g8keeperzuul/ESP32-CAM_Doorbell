@@ -95,6 +95,64 @@ However a slight alternative is here: https://electronics.stackexchange.com/ques
 ![ENable pin HIGH](doc/circuit-20230115-1859.png)
 
 
+## Integration with Home Assistant
+
+This doorbell is tightly integrated with HA since it makes several HTTP posts to update its state directly with the HA server (unlike other sensors that use an MQTT broker, device hub, or radio receiver (rtl_433) as an intermediary).
+
+Define a [local file camera](https://www.home-assistant.io/integrations/local_file/) in HA **configuration.yaml**:
+```
+camera:     
+  - name: "Doorbell Snapshot" 
+    # entity_id becomes "camera.doorbell_snapshot"   
+    platform: local_file
+    file_path: /config/www/doorbell-snapshots/sample_doorbell_image.jpg    
+```
+
+The doorbell device will upload a picture to HA's media repository. The existing API endpoint was used for this (the same API used when manually uploading media via the browser).
+
+It is important to understand that during upload the destination must match a *key* under media_dirs. 
+
+In HA **configuration.yaml**:
+```
+homeassistant:
+  media_dirs:    
+    doorbell: /config/www/doorbell-snapshots
+    multimedia: /media    
+```
+
+Once the picture is uploaded, the HA service will be called by the doorbell device to update the picture displayed by the local file camera.
+
+HTTP post to /api/services/local_file/update_file_path
+with payload
+```
+{ "entity_id": "camera.doorbell_snapshot", "file_path": "/config/www/doorbell-snapshots/somefilename.jpg"}
+```
+Notice that the file_path parameter uses the actual filesystem location and not the media_dir key that was specified during upload. 
+
+Finally, if the optional battery test is included, then the results of that are sent to HA.
+
+HTTP post to /api/states/sensor.doorbell_battery
+with payload
+```
+{"state": 86.7, "attributes":{"friendly_name": "Doorbell Battery Level", "unit_of_measurement": "%", "icon": "mdi:battery-50", "batt_mv": 3567, "boot_count": 14 }}
+```
+
+The **sensor.doorbell_battery** does not need to be predefined in HA's configuration.yaml.
+However, to extract some of the embedded attributes, you will need to predefine a template sensor.
+
+```
+template:
+    sensor:
+        # Doorbell battery mV ranges from 3740..3000 considered dead at 3V)
+      - name: "Doorbell Battery Voltage"  
+        unique_id: doorbell_battery_volts
+        device_class: Voltage
+        state_class: measurement
+        unit_of_measurement: "mV"
+        icon: mdi:flash-triangle
+        state: >
+          {{ state_attr("sensor.doorbell_battery", "batt_mv") | int(default=0) }}
+```
 
 ## Sample Debug Log
 
